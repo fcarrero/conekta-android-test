@@ -15,7 +15,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import io.conekta.CustomersApi
+import io.conekta.OrdersApi
+import io.conekta.TokensApi
+import io.conekta.model.ChargeRequest
+import io.conekta.model.ChargeRequestPaymentMethod
 import io.conekta.model.Customer
+import io.conekta.model.OrderRequest
+import io.conekta.model.OrderRequestCustomerInfo
+import io.conekta.model.Product
+import io.conekta.model.Token
+import io.conekta.model.TokenCard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -45,7 +54,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         modifier = modifier
     )
     Button(onClick =  {
-        call()
+        callCreateToken()
     }) {
 
     }
@@ -82,6 +91,88 @@ fun call() {
 
         } catch (ex: Exception) {
             Log.e("API Error", "Error creating customer", ex)
+        }
+    }
+}
+fun callCreateToken() {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val apiKey = "key_xxx"
+            val api = TokensApi()
+            api.setApiKey(apiKey)
+
+            // Crear la tarjeta
+            val card = TokenCard().apply {
+                cvc = "123"
+                name = "fran carrero"
+                expYear = "2028"
+                expMonth = "12"
+                number = "4242424242424242"
+            }
+
+            // Crear el token
+            val token = Token()
+            token.card = card
+
+            // Llamada a la API para crear el token, asegurándote que esté en Dispatchers.IO
+            val tokenResponse = withContext(Dispatchers.IO) {
+                api.createToken(token, "es")
+            }
+
+            // Log en el hilo principal para mostrar el token
+            withContext(Dispatchers.Main) {
+                Log.d("API Response", "Token created successfully: $tokenResponse")
+            }
+
+            // Creación de la orden usando el token
+            val orderApi = OrdersApi()
+            orderApi.setApiKey(apiKey)
+
+            val paymentMethod = ChargeRequestPaymentMethod().apply {
+                tokenId = tokenResponse.id
+                type = "card"
+            }
+
+            val chargeRequest = ChargeRequest()
+            chargeRequest.paymentMethod = paymentMethod
+
+            val charges: List<ChargeRequest> = listOf(chargeRequest)
+
+            val products: List<Product> = listOf(
+                Product().apply {
+                    quantity = 1
+                    unitPrice = 5000
+                    name = "test"
+                }
+            )
+
+            val orderRequestCustomerInfo = OrderRequestCustomerInfo().apply {
+                name = "android"
+                email = "mauriciocarrero15@gmail.com"
+                phone = "+573143159054"
+            }
+
+            val request = OrderRequest().apply {
+                this.charges = charges
+                this.currency = "MXN"
+                this.customerInfo = orderRequestCustomerInfo
+                this.lineItems = products
+            }
+
+            // Llamada a la API para crear la orden, asegurándote que esté en Dispatchers.IO
+            val orderResponse = withContext(Dispatchers.IO) {
+                orderApi.createOrder(request, "es", null)
+            }
+
+            // Log en el hilo principal para mostrar la orden
+            withContext(Dispatchers.Main) {
+                Log.d("API Response", "Order created successfully: $orderResponse")
+            }
+
+        } catch (ex: Exception) {
+            withContext(Dispatchers.Main) {
+                Log.e("API Error", "Error creating customer or order", ex)
+            }
         }
     }
 }
